@@ -31,8 +31,10 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** Handy class to find all transitive dependencies of a given target */
@@ -119,6 +121,19 @@ public class TransitiveDependencyMap {
   public static Stream<TargetKey> getTransitiveDependenciesStream(
       Collection<TargetKey> keys, TargetMap targetMap) {
     return Streams.stream(new TransitiveDependencyIterator(keys, targetMap));
+  }
+
+  /**
+   * Returns a stream which traverses the transitive dependencies of the given collection of Blaze
+   * targets, including the top-level targets themselves.
+   */
+  public static Stream<TargetKey> getDependenciesStream(TargetMap targetMap) {
+    List<TargetKey> keys = targetMap.targets().stream()
+        .map(x -> x.getKey()).collect(Collectors.toList());
+    return Stream.concat(
+        keys.stream(),
+        getTransitiveDependenciesStream(keys, targetMap)
+    ).distinct();
   }
 
   /**

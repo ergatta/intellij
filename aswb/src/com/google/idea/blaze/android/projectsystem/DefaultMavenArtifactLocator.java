@@ -1,20 +1,46 @@
 package com.google.idea.blaze.android.projectsystem;
 
 import com.android.ide.common.repository.GradleCoordinate;
-import com.google.common.collect.ImmutableList;
+import com.google.idea.blaze.base.ideinfo.TargetKey;
+import com.google.idea.blaze.base.ideinfo.TargetMap;
+import com.google.idea.blaze.base.model.BlazeProjectData;
 import com.google.idea.blaze.base.model.primitives.Label;
 import com.google.idea.blaze.base.settings.BuildSystemName;
-import com.intellij.openapi.extensions.ExtensionPointName;
+import com.google.idea.blaze.base.sync.data.BlazeProjectDataManager;
+import com.google.idea.blaze.base.targetmaps.TransitiveDependencyMap;
+import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.project.Project;
 
 
 public class DefaultMavenArtifactLocator implements MavenArtifactLocator {
+    private static final Logger log = Logger.getInstance(DefaultMavenArtifactLocator.class);
 
-    public Label labelFor(GradleCoordinate coordinate) {
-        return Label.create(String.format("@maven//:%s_%s",
-                        coordinate.getGroupId().replaceAll("[.-]", "_"),
-                        coordinate.getArtifactId().replaceAll("[.-]", "_")
-                )
+    /**
+     * Locate an artifact label by maven coordinates. This is somewhat brittle,
+     * but Android Studio requests specific artifacts needed for their preview
+     * system, so we make our best attempt here to locate them using `maven_install`
+     * patterned artifacts.
+     */
+    public Label labelFor(Project project, GradleCoordinate coordinate) {
+        BlazeProjectData blazeProjectData =
+            BlazeProjectDataManager.getInstance(project).getBlazeProjectData();
+        TargetMap targetMap = blazeProjectData.getTargetMap();
+
+        String labelSuffix = String.format(":%s_%s",
+            coordinate.getGroupId().replaceAll("[.-]", "_"),
+            coordinate.getArtifactId().replaceAll("[.-]", "_")
         );
+
+        return TransitiveDependencyMap.getDependenciesStream(targetMap)
+            .filter(x -> x.getLabel().toString().endsWith(labelSuffix))
+            .map(TargetKey::getLabel).findFirst()
+            .orElseGet(() -> {
+                Label bestGuess = Label.create("@maven//" + labelSuffix);
+                log.warn(String.format(
+                    "Could not find exact label for %s, returning best guess of %s",
+                    coordinate, bestGuess));
+                return bestGuess;
+            });
     }
 
     public BuildSystemName buildSystem() {
