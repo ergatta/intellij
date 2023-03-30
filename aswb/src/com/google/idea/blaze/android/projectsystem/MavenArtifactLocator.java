@@ -20,6 +20,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.idea.blaze.base.model.primitives.Label;
 import com.google.idea.blaze.base.settings.BuildSystemName;
 import com.intellij.openapi.extensions.ExtensionPointName;
+import com.intellij.openapi.project.Project;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -41,7 +43,7 @@ public interface MavenArtifactLocator {
    *
    * @param coordinate GradleCoordinate for the artifact.
    */
-  Label labelFor(GradleCoordinate coordinate);
+  Label labelFor(Project project, GradleCoordinate coordinate);
 
   /** Returns the {@link BuildSystemName} this {@link MavenArtifactLocator} supports. */
   BuildSystemName buildSystem();
