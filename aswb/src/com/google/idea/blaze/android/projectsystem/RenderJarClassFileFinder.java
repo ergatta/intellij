@@ -78,11 +78,12 @@ public class RenderJarClassFileFinder implements ClassFileFinder {
 
   /**
    * Experiment to toggle whether resource resolution is allowed from Render JARs. Render JARs
-   * should not resolve resources by default.
+   * should not resolve resources by default, but the full ClassLoader mechanics of the preview
+   * screen requires that all classes resolve in order to display the content, so we allow it.
    */
   @VisibleForTesting
   static final BoolExperiment resolveResourceClasses =
-      new BoolExperiment("aswb.resolve.resources.render.jar", true); // needed for previews
+      new BoolExperiment("aswb.resolve.resources.render.jar", true);
 
   private static final Logger log = Logger.getInstance(RenderJarClassFileFinder.class);
 
@@ -186,8 +187,6 @@ public class RenderJarClassFileFinder implements ClassFileFinder {
         return classFile;
       }
     }
-
-    // TODO: look into BlazeLightResourceClassService?
 
     VirtualFile moduleClass = findFQCNInModule(fqcn, this.module);
     if (moduleClass == null) {
