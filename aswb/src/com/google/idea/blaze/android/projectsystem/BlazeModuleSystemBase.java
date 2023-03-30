@@ -89,8 +89,14 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.ProjectScope;
+import kotlin.Triple;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
+
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -101,9 +107,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
-import kotlin.Triple;
-import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.TestOnly;
 
 /** Blaze implementation of {@link AndroidModuleSystem}. */
 @SuppressWarnings("NullableProblems")
@@ -251,6 +254,10 @@ abstract class BlazeModuleSystemBase implements AndroidModuleSystem {
         fileEditorManager.openFile(buildVirtualFile, true);
       }
     }
+  }
+
+  public void clearCache() {
+    classFileFinder.clearCache();
   }
 
   @Nullable
@@ -430,7 +437,7 @@ abstract class BlazeModuleSystemBase implements AndroidModuleSystem {
     // labels in order to find them.
     return MavenArtifactLocator.forBuildSystem(Blaze.getBuildSystemName(module.getProject()))
         .stream()
-        .map(locator -> locator.labelFor(coordinate))
+        .map(locator -> locator.labelFor(module.getProject(), coordinate))
         .filter(Objects::nonNull)
         .map(TargetKey::forPlainTarget);
   }
@@ -640,14 +647,27 @@ abstract class BlazeModuleSystemBase implements AndroidModuleSystem {
               library.aarArtifact));
       return null;
     }
+
     File resFolder = unpackedAars.getResourceDirectory(decoder, library);
     PathString resFolderPathString = resFolder == null ? null : new PathString(resFolder);
+    PathString manifest = resFolderPathString == null
+            ? null
+            : resFolderPathString.getParentOrRoot().resolve("AndroidManifest.xml");
+    String resourcePackage = library.resourcePackage;
+    if ((resourcePackage == null || resourcePackage == "") && manifest != null) {
+      try (InputStream is = new FileInputStream(manifest.toFile())) {
+        ManifestParser.ParsedManifest parsedManifest = ManifestParser.parseManifestFromInputStream(is);
+        resourcePackage = parsedManifest.packageName;
+      } catch (IOException ioe) {
+        logger.warn(
+            String.format("Could not parse package from manifest in library %s", aarFile.getName()));
+        return null;
+      }
+    }
+
     return new ExternalLibraryImpl(library.key.toString())
         .withLocation(new PathString(aarFile))
-        .withManifestFile(
-            resFolderPathString == null
-                ? null
-                : resFolderPathString.getParentOrRoot().resolve("AndroidManifest.xml"))
+        .withManifestFile(manifest)
         .withResFolder(
             resFolderPathString == null
                 ? null
@@ -656,7 +676,7 @@ abstract class BlazeModuleSystemBase implements AndroidModuleSystem {
             resFolderPathString == null
                 ? null
                 : resFolderPathString.getParentOrRoot().resolve("R.txt"))
-        .withPackageName(library.resourcePackage);
+        .withPackageName(resourcePackage);
   }
 
   @Override

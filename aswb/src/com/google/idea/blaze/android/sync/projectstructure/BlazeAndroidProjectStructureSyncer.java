@@ -33,6 +33,7 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.idea.blaze.android.manifest.ManifestParser;
 import com.google.idea.blaze.android.manifest.ParsedManifestService;
+import com.google.idea.blaze.android.projectsystem.BlazeModuleSystem;
 import com.google.idea.blaze.android.projectview.GeneratedAndroidResourcesSection;
 import com.google.idea.blaze.android.resources.BlazeLightResourceClassService;
 import com.google.idea.blaze.android.sync.importer.BlazeAndroidWorkspaceImporter;
@@ -358,6 +359,7 @@ public class BlazeAndroidProjectStructureSyncer {
           configAndroidJava8Libs);
       rClassBuilder.addRClass(modulePackage, module);
       sourcePackages.remove(modulePackage);
+      BlazeModuleSystem.getInstance(module).clearCache();
     }
 
     rClassBuilder.addWorkspacePackages(sourcePackages);

@@ -15,8 +15,6 @@
  */
 package com.google.idea.blaze.android.projectsystem;
 
-import static java.util.stream.Collectors.joining;
-
 import com.android.tools.idea.projectsystem.ClassFileFinder;
 import com.android.tools.idea.projectsystem.ClassFileFinderUtil;
 import com.google.common.annotations.VisibleForTesting;
@@ -25,6 +23,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.idea.blaze.android.libraries.RenderJarCache;
 import com.google.idea.blaze.android.sync.model.AndroidResourceModule;
 import com.google.idea.blaze.android.sync.model.AndroidResourceModuleRegistry;
+import com.google.idea.blaze.android.sync.model.idea.BlazeClassJarProvider;
 import com.google.idea.blaze.android.targetmaps.TargetToBinaryMap;
 import com.google.idea.blaze.base.ideinfo.TargetIdeInfo;
 import com.google.idea.blaze.base.ideinfo.TargetKey;
@@ -42,13 +41,26 @@ import com.google.idea.common.experiments.BoolExperiment;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.module.Module;
+import com.intellij.openapi.module.ModuleManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.JarFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
-import java.io.File;
-import java.util.regex.Pattern;
+import com.intellij.psi.JavaPsiFacade;
+import com.intellij.psi.PsiClass;
+import com.intellij.psi.search.ProjectScope;
+import org.jetbrains.android.util.AndroidUtils;
 import org.jetbrains.annotations.Nullable;
+
+import java.io.File;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+import static java.util.stream.Collectors.joining;
 
 /**
  * A {@link ClassFileFinder} that uses deploy JAR like artifacts (called render jar henceforth) for
@@ -66,6 +78,8 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>NOTE: Blaze targets that constitutes the resource module will be called "resource target(s)"
  * in comments below.
+ *
+ * TODO: The role of this class has expanded beyond just render jar resolution. Should rename it.
  */
 public class RenderJarClassFileFinder implements ClassFileFinder {
   /** Experiment to control whether class file finding from render jars should be enabled. */
@@ -74,11 +88,12 @@ public class RenderJarClassFileFinder implements ClassFileFinder {
 
   /**
    * Experiment to toggle whether resource resolution is allowed from Render JARs. Render JARs
-   * should not resolve resources by default.
+   * should not resolve resources by default, but the full ClassLoader mechanics of the preview
+   * screen require that all classes resolve in order to display the content, so we allow it.
    */
   @VisibleForTesting
   static final BoolExperiment resolveResourceClasses =
-      new BoolExperiment("aswb.resolve.resources.render.jar", false);
+      new BoolExperiment("aswb.resolve.resources.render.jar", true);
 
   private static final Logger log = Logger.getInstance(RenderJarClassFileFinder.class);
 
@@ -89,6 +104,7 @@ public class RenderJarClassFileFinder implements ClassFileFinder {
 
   private final Module module;
   private final Project project;
+
 
   // tracks the binary targets that depend resource targets
   // will be recalculated after every sync
@@ -102,10 +118,13 @@ public class RenderJarClassFileFinder implements ClassFileFinder {
   // true if the current module is the .workspace Module
   private final boolean isWorkspaceModule;
 
+  private Map<String, File> packageJarHint = new HashMap();
+
   public RenderJarClassFileFinder(Module module) {
     this.module = module;
     this.project = module.getProject();
     this.isWorkspaceModule = BlazeDataStorage.WORKSPACE_MODULE_NAME.equals(module.getName());
+    clearCache();
   }
 
   @Nullable
@@ -190,12 +209,30 @@ public class RenderJarClassFileFinder implements ClassFileFinder {
     for (TargetKey binaryTarget : binaryTargets) {
       VirtualFile classFile = getClassFromRenderResolveJar(projectData, fqcn, binaryTarget);
       if (classFile != null) {
+        log.warn(String.format("Found class %s in target %s", fqcn, binaryTarget.toString()));
         return classFile;
       }
     }
 
+    VirtualFile moduleClass = searchForFQCNInModule(fqcn);
+    if (moduleClass != null) {
+      return moduleClass;
+    }
+
+    // Fall back to workspace resolution
+    if (!isWorkspaceModule) {
+      Module workspaceModule = ModuleManager.getInstance(project)
+          .findModuleByName(BlazeDataStorage.WORKSPACE_MODULE_NAME);
+      return BlazeModuleSystem.getInstance(workspaceModule).classFileFinder.findClass(fqcn);
+    }
+
     log.warn(String.format("Could not find class `%1$s` (module: `%2$s`)", fqcn, module.getName()));
     return null;
+  }
+
+  public synchronized void clearCache() {
+    log.warn("clearing cache");
+    packageJarHint = new HashMap();
   }
 
   @VisibleForTesting
@@ -266,6 +303,64 @@ public class RenderJarClassFileFinder implements ClassFileFinder {
     }
 
     return findClassInJar(renderResolveJarVF, fqcn);
+  }
+
+  @Nullable
+  private VirtualFile searchForFQCNInModule(String fqcn) {
+    // keeps throwing java.lang.Throwable: Slow operations are prohibited on EDT. See SlowOperations.assertSlowOperationsAreAllowed javadoc
+    /*VirtualFile psiFile = ApplicationManager.getApplication().runReadAction((Computable<VirtualFile>) () -> {
+      try {
+        final JavaPsiFacade facade = JavaPsiFacade.getInstance(project);
+        PsiClass baseClass =
+                facade.findClass(fqcn, ProjectScope.getAllScope(project));
+        if (baseClass == null) {
+          return null;
+        }
+        VirtualFile theFile = baseClass.getNavigationElement().getContainingFile().getVirtualFile();
+        if (theFile.toString().endsWith(".class")) {
+          return theFile;
+        }
+      } catch (Throwable t) {
+        log.warn("failed to use JavaPsiFacade: " + t.getLocalizedMessage());
+      }
+      return null;
+    });
+
+    if (psiFile != null) {
+      return psiFile;
+    }*/
+
+    String pkg = null;
+    int pkgIdx = fqcn.lastIndexOf('.');
+    if (pkgIdx != -1) {
+      pkg = fqcn.substring(0, pkgIdx);
+    }
+    File hintJar = pkg == null ? null : packageJarHint.get(pkg);
+    if (hintJar != null) {
+      VirtualFile jarVF = VirtualFileSystemProvider.getInstance().getSystem().findFileByIoFile(hintJar);
+      if (jarVF != null) {
+        VirtualFile foundClass = findClassInJar(jarVF, fqcn);
+        if (foundClass != null) {
+          return foundClass;
+        }
+      }
+    }
+    List<File> moduleLibraries = new BlazeClassJarProvider(this.project).getModuleExternalLibraries(module);
+
+    for (File jar : moduleLibraries) {
+      VirtualFile jarVF = VirtualFileSystemProvider.getInstance().getSystem().findFileByIoFile(jar);
+      if (jarVF == null) {
+        continue;
+      }
+      VirtualFile foundClass = findClassInJar(jarVF, fqcn);
+      if (foundClass != null) {
+        if (pkg != null) {
+          packageJarHint.put(pkg, jar);
+        }
+        return foundClass;
+      }
+    }
+    return null;
   }
 
   @Nullable

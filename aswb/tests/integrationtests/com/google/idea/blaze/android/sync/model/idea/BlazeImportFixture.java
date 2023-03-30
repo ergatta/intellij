@@ -64,8 +64,9 @@ import com.google.idea.blaze.java.sync.jdeps.MockJdepsMap;
 import com.google.idea.blaze.java.sync.model.BlazeJavaImportResult;
 import com.google.idea.blaze.java.sync.model.BlazeJavaSyncData;
 import com.intellij.openapi.project.Project;
-import java.io.File;
 import org.jetbrains.annotations.NotNull;
+
+import java.io.File;
 
 /**
  * Fixture that generates a number of data structures related to blaze import for a hardcoded
@@ -201,7 +202,7 @@ public final class BlazeImportFixture {
       mavenArtifactLocator =
           new MavenArtifactLocator() {
             @Override
-            public Label labelFor(GradleCoordinate coordinate) {
+            public Label labelFor(Project project, GradleCoordinate coordinate) {
               return GoogleMavenArtifactIdCompat.getLabelForGoogleMaventArtifact(coordinate);
             }
 
