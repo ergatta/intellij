@@ -205,6 +205,10 @@ abstract class BlazeModuleSystemBase implements AndroidModuleSystem {
     }
   }
 
+  public void clearCache() {
+    classFileFinder.clearCache();
+  }
+
   @Nullable
   @Override
   public GradleCoordinate getRegisteredDependency(GradleCoordinate coordinate) {
