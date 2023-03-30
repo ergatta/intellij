@@ -79,7 +79,7 @@ public class RenderJarClassFileFinder implements ClassFileFinder {
   /**
    * Experiment to toggle whether resource resolution is allowed from Render JARs. Render JARs
    * should not resolve resources by default, but the full ClassLoader mechanics of the preview
-   * screen requires that all classes resolve in order to display the content, so we allow it.
+   * screen require that all classes resolve in order to display the content, so we allow it.
    */
   @VisibleForTesting
   static final BoolExperiment resolveResourceClasses =
