@@ -15,8 +15,6 @@
  */
 package com.google.idea.blaze.android.projectsystem;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
-
 import com.android.ide.common.util.PathString;
 import com.android.projectmodel.ExternalAndroidLibrary;
 import com.android.projectmodel.ExternalLibraryImpl;
@@ -26,6 +24,7 @@ import com.android.tools.idea.projectsystem.DependencyScopeType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.idea.blaze.android.libraries.UnpackedAars;
+import com.google.idea.blaze.android.manifest.ManifestParser;
 import com.google.idea.blaze.android.sync.model.AarLibrary;
 import com.google.idea.blaze.android.sync.model.AndroidResourceModuleRegistry;
 import com.google.idea.blaze.android.sync.model.BlazeAndroidSyncData;
@@ -44,15 +43,20 @@ import com.google.idea.blaze.base.sync.workspace.ArtifactLocationDecoder;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
+import org.jetbrains.annotations.Nullable;
+
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.stream.Stream;
-import org.jetbrains.annotations.Nullable;
+
+import static com.google.common.collect.ImmutableList.toImmutableList;
 
 /** Blaze implementation of {@link AndroidModuleSystem}. */
 public class BlazeModuleSystem extends BlazeModuleSystemBase {
@@ -166,14 +170,26 @@ public class BlazeModuleSystem extends BlazeModuleSystemBase {
               library.aarArtifact));
       return null;
     }
+
     File resFolder = unpackedAars.getResourceDirectory(decoder, library);
     PathString resFolderPathString = resFolder == null ? null : new PathString(resFolder);
+    PathString manifest = resFolderPathString == null
+            ? null
+            : resFolderPathString.getParentOrRoot().resolve("AndroidManifest.xml");
+    String resourcePackage = library.resourcePackage;
+    if ((resourcePackage == null || resourcePackage == "") && manifest != null) {
+      try (InputStream is = new FileInputStream(manifest.toFile())) {
+        ManifestParser.ParsedManifest parsedManifest = ManifestParser.parseManifestFromInputStream(is);
+        resourcePackage = parsedManifest.packageName;
+      } catch (IOException ioe) {
+        logger.warn(
+            String.format("Could not parse package from manifest in library %s", aarFile.getName()));
+        return null;
+      }
+    }
     return new ExternalLibraryImpl(library.key.toString())
         .withLocation(new PathString(aarFile))
-        .withManifestFile(
-            resFolderPathString == null
-                ? null
-                : resFolderPathString.getParentOrRoot().resolve("AndroidManifest.xml"))
+        .withManifestFile(manifest)
         .withResFolder(
             resFolderPathString == null
                 ? null
@@ -182,7 +198,7 @@ public class BlazeModuleSystem extends BlazeModuleSystemBase {
             resFolderPathString == null
                 ? null
                 : resFolderPathString.getParentOrRoot().resolve("R.txt"))
-        .withPackageName(library.resourcePackage);
+        .withPackageName(resourcePackage);
   }
 
   @Override
