@@ -77,6 +77,10 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.ProjectScope;
+import kotlin.Triple;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -85,9 +89,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
-import kotlin.Triple;
-import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.TestOnly;
 
 /** Blaze implementation of {@link AndroidModuleSystem}. */
 @SuppressWarnings("NullableProblems")
@@ -210,6 +211,10 @@ abstract class BlazeModuleSystemBase implements AndroidModuleSystem {
         fileEditorManager.openFile(buildVirtualFile, true);
       }
     }
+  }
+
+  public void clearCache() {
+    classFileFinder.clearCache();
   }
 
   @Nullable
@@ -389,7 +394,7 @@ abstract class BlazeModuleSystemBase implements AndroidModuleSystem {
     // labels in order to find them.
     return MavenArtifactLocator.forBuildSystem(Blaze.getBuildSystemName(module.getProject()))
         .stream()
-        .map(locator -> locator.labelFor(coordinate))
+        .map(locator -> locator.labelFor(module.getProject(), coordinate))
         .filter(Objects::nonNull)
         .map(TargetKey::forPlainTarget);
   }
