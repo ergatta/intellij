@@ -183,7 +183,7 @@ public class BlazeModuleSystem extends BlazeModuleSystemBase {
         resourcePackage = parsedManifest.packageName;
       } catch (IOException ioe) {
         logger.warn(
-                String.format("Could not parse package from manifest in library %s", aarFile.getName()));
+            String.format("Could not parse package from manifest in library %s", aarFile.getName()));
         return null;
       }
     }

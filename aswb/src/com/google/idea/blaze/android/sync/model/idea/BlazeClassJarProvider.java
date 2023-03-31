@@ -15,12 +15,9 @@
  */
 package com.google.idea.blaze.android.sync.model.idea;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
-
 import com.android.tools.idea.model.ClassJarProvider;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.idea.blaze.android.libraries.RenderJarCache;
 import com.google.idea.blaze.android.sync.model.AndroidResourceModuleRegistry;
 import com.google.idea.blaze.android.targetmaps.TargetToBinaryMap;
@@ -34,13 +31,13 @@ import com.google.idea.blaze.base.ideinfo.TargetKey;
 import com.google.idea.blaze.base.ideinfo.TargetMap;
 import com.google.idea.blaze.base.model.BlazeProjectData;
 import com.google.idea.blaze.base.qsync.QuerySync;
+import com.google.idea.blaze.base.sync.data.BlazeDataStorage;
 import com.google.idea.blaze.base.sync.data.BlazeProjectDataManager;
 import com.google.idea.blaze.base.sync.workspace.ArtifactLocationDecoder;
 import com.google.idea.blaze.base.targetmaps.TransitiveDependencyMap;
 import com.google.idea.common.experiments.BoolExperiment;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
-import com.google.idea.blaze.base.sync.data.BlazeDataStorage;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Computable;
@@ -52,9 +49,13 @@ import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.search.GlobalSearchScope;
+
 import java.io.File;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
+
+import static com.google.common.collect.ImmutableList.toImmutableList;
 
 /** Collects class jars from the user's build. */
 public class BlazeClassJarProvider implements ClassJarProvider {
@@ -86,7 +87,7 @@ public class BlazeClassJarProvider implements ClassJarProvider {
     boolean isWorkspaceModule = BlazeDataStorage.WORKSPACE_MODULE_NAME.equals(module.getName());
 
     if (isWorkspaceModule) {
-      return getAllExternalLibraires(targetMap, decoder);
+      return getAllExternalLibraries(targetMap, decoder);
     }
 
     if (useRenderJarForExternalLibraries.getValue()) {
@@ -194,41 +195,18 @@ public class BlazeClassJarProvider implements ClassJarProvider {
     return false;
   }
 
-    List<File> getAllExternalLibraires(TargetMap targetMap, ArtifactLocationDecoder decoder) {
-        ImmutableSet.Builder<JavaIdeInfo> infos = ImmutableSet.builder();
-        for (TargetIdeInfo target : targetMap.targets()) {
-            for (TargetKey dependencyTargetKey :
-                    TransitiveDependencyMap.getInstance(project).getTransitiveDependencies(target.getKey())) {
-                TargetIdeInfo dependencyTarget = targetMap.get(dependencyTargetKey);
-                if (dependencyTarget == null) {
-                    continue;
-                }
-
-                // Add all import jars as external libraries.
-                JavaIdeInfo javaIdeInfo = dependencyTarget.getJavaIdeInfo();
-                if (javaIdeInfo != null) {
-                    infos.add(javaIdeInfo);
-                }
-            }
-            JavaIdeInfo javaIdeInfo = target.getJavaIdeInfo();
-            if (javaIdeInfo != null) {
-                infos.add(javaIdeInfo);
-            }
-        }
-        ImmutableList.Builder<File> results = ImmutableList.builder();
-        for (JavaIdeInfo javaIdeInfo : infos.build()) {
-            for (LibraryArtifact jar : javaIdeInfo.getJars()) {
-                ArtifactLocation classJar = jar.getClassJar();
-                if (classJar != null) {
-                    results.add(
-                            Preconditions.checkNotNull(
-                                    OutputArtifactResolver.resolve(project, decoder, classJar),
-                                    "Fail to find file %s",
-                                    classJar.getRelativePath()));
-                }
-            }
-        }
-
-        return results.build();
-    }
+  List<File> getAllExternalLibraries(TargetMap targetMap, ArtifactLocationDecoder decoder) {
+    return TransitiveDependencyMap.getDependenciesStream(targetMap)
+        .map(x -> {
+          TargetIdeInfo target = targetMap.get(x);
+          if (target != null) {
+            return target.getJavaIdeInfo();
+          }
+          return null;
+        }).filter(Objects::nonNull)
+        .flatMap(x -> x.getJars().stream())
+        .map(LibraryArtifact::getClassJar).filter(Objects::nonNull)
+        .map(x -> OutputArtifactResolver.resolve(project, decoder, x))
+        .collect(Collectors.toList());
+  }
 }
