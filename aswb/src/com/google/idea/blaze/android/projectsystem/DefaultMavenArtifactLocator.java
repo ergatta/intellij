@@ -3,7 +3,6 @@ package com.google.idea.blaze.android.projectsystem;
 import com.android.ide.common.repository.GradleCoordinate;
 import com.google.idea.blaze.base.ideinfo.TargetKey;
 import com.google.idea.blaze.base.ideinfo.TargetMap;
-import com.google.idea.blaze.base.model.BlazeProjectData;
 import com.google.idea.blaze.base.model.primitives.Label;
 import com.google.idea.blaze.base.settings.BuildSystemName;
 import com.google.idea.blaze.base.sync.data.BlazeProjectDataManager;
@@ -19,12 +18,11 @@ public class DefaultMavenArtifactLocator implements MavenArtifactLocator {
      * Locate an artifact label by maven coordinates. This is somewhat brittle,
      * but Android Studio requests specific artifacts needed for their preview
      * system, so we make our best attempt here to locate them using `maven_install`
-     * patterned artifacts.
+     * patterned bazel artifacts.
      */
     public Label labelFor(Project project, GradleCoordinate coordinate) {
-        BlazeProjectData blazeProjectData =
-            BlazeProjectDataManager.getInstance(project).getBlazeProjectData();
-        TargetMap targetMap = blazeProjectData.getTargetMap();
+        TargetMap targetMap = BlazeProjectDataManager.getInstance(project)
+            .getBlazeProjectData().getTargetMap();
 
         String labelSuffix = String.format(":%s_%s",
             coordinate.getGroupId().replaceAll("[.-]", "_"),
