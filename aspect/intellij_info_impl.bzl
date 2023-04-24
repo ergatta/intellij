@@ -149,11 +149,19 @@ def get_source_jars(output):
         return [output.source_jar]
     return []
 
-def library_artifact(java_output):
+def get_rule_source_jar(rule):
+    if hasattr(rule.attr, "srcjar"):
+        if rule.attr.srcjar != None:
+            return rule.attr.srcjar.files.to_list()
+    return []
+
+def library_artifact(java_output, rule=None):
     """Creates a LibraryArtifact representing a given java_output."""
     if java_output == None or java_output.class_jar == None:
         return None
     src_jars = get_source_jars(java_output)
+    if rule and not src_jars:
+        src_jars = get_rule_source_jar(rule)
     return struct_omit_none(
         interface_jar = artifact_location(java_output.ijar),
         jar = artifact_location(java_output.class_jar),
@@ -591,7 +599,7 @@ def collect_java_info(target, ctx, semantics, ide_info, ide_info_file, output_gr
 
     ide_info_files = []
     sources = sources_from_target(ctx)
-    jars = [library_artifact(output) for output in java_outputs]
+    jars = [library_artifact(output, ctx.rule) for output in java_outputs]
     class_jars = [output.class_jar for output in java_outputs if output and output.class_jar]
     output_jars = [jar for output in java_outputs for jar in jars_from_output(output)]
     resolve_files = output_jars
