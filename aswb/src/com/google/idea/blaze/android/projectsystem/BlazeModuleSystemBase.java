@@ -225,8 +225,6 @@ abstract class BlazeModuleSystemBase implements AndroidModuleSystem {
     }
 
     // TODO: automagically edit deps instead of just opening the BUILD file?
-    // Need to translate Gradle coordinates into blaze targets.
-    // Will probably need to hardcode for each dependency.
     FileEditorManager fileEditorManager = FileEditorManager.getInstance(project);
     PsiElement buildTargetPsi =
         BuildReferenceManager.getInstance(project).resolveLabel(targetIdeInfo.getKey().getLabel());
