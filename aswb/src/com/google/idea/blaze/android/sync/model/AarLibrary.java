@@ -181,6 +181,7 @@ public final class AarLibrary extends BlazeLibrary {
 
     @Override
     public ImmutableList<File> getSourceFiles(BlazeProjectData blazeProjectData) {
+      // TODO: look into for source resolution
       // Unconditionally add any linked to source jars. BlazeJarLibrary doesn't do this - it only
       // attaches sources for libraries that the user explicitly asks for. We don't do that for two
       // reasons: 1) all the logic for attaching sources to a library (AttachSourceJarAction,
