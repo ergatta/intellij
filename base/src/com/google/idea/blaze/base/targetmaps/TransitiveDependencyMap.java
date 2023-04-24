@@ -124,19 +124,6 @@ public class TransitiveDependencyMap {
   }
 
   /**
-   * Returns a stream which traverses the transitive dependencies of the given collection of Blaze
-   * targets, including the top-level targets themselves.
-   */
-  public static Stream<TargetKey> getDependenciesStream(TargetMap targetMap) {
-    List<TargetKey> keys = targetMap.targets().stream()
-        .map(x -> x.getKey()).collect(Collectors.toList());
-    return Stream.concat(
-        keys.stream(),
-        getTransitiveDependenciesStream(keys, targetMap)
-    ).distinct();
-  }
-
-  /**
    * An iterator which performs a breadth-first traversal over the transitive dependencies of a
    * collection of Blaze targets. Targets in the top-level collection will only be included in the
    * traversal if they appear as a transitive dependency of another top-level target. For example,

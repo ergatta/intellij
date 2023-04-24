@@ -91,7 +91,7 @@ public class BlazeClassJarProvider implements ClassJarProvider {
     }
 
     if (useRenderJarForExternalLibraries.getValue()) {
-      return TargetToBinaryMap.getInstance(project).getSourceBinaryTargets().stream()
+      List<File> renderJarLibraries = TargetToBinaryMap.getInstance(project).getSourceBinaryTargets().stream()
           .filter(targetMap::contains)
           .map(
               (binaryTarget) ->
@@ -99,6 +99,9 @@ public class BlazeClassJarProvider implements ClassJarProvider {
                       .getCachedJarForBinaryTarget(decoder, targetMap.get(binaryTarget)))
           .filter(Objects::nonNull)
           .collect(toImmutableList());
+      if (!renderJarLibraries.isEmpty()) {
+        return renderJarLibraries;
+      }
     }
 
     AndroidResourceModuleRegistry registry = AndroidResourceModuleRegistry.getInstance(project);
@@ -196,14 +199,9 @@ public class BlazeClassJarProvider implements ClassJarProvider {
   }
 
   List<File> getAllExternalLibraries(TargetMap targetMap, ArtifactLocationDecoder decoder) {
-    return TransitiveDependencyMap.getDependenciesStream(targetMap)
-        .map(x -> {
-          TargetIdeInfo target = targetMap.get(x);
-          if (target != null) {
-            return target.getJavaIdeInfo();
-          }
-          return null;
-        }).filter(Objects::nonNull)
+    return targetMap.targets().stream()
+        .map(x -> x.getJavaIdeInfo())
+        .filter(Objects::nonNull)
         .flatMap(x -> x.getJars().stream())
         .map(LibraryArtifact::getClassJar).filter(Objects::nonNull)
         .map(x -> OutputArtifactResolver.resolve(project, decoder, x))

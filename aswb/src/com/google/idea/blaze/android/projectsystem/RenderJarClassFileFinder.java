@@ -114,7 +114,6 @@ public class RenderJarClassFileFinder implements ClassFileFinder {
   // true if the current module is the .workspace Module
   private final boolean isWorkspaceModule;
 
-  private List<File> moduleLibraries = Collections.emptyList();
   private Map<String, File> packageJarHint = new HashMap();
 
   public RenderJarClassFileFinder(Module module) {
@@ -212,7 +211,6 @@ public class RenderJarClassFileFinder implements ClassFileFinder {
 
   public synchronized void clearCache() {
     log.warn("clearing cache");
-    moduleLibraries = new BlazeClassJarProvider(this.project).getModuleExternalLibraries(module);
     packageJarHint = new HashMap();
   }
 
@@ -288,7 +286,8 @@ public class RenderJarClassFileFinder implements ClassFileFinder {
 
   @Nullable
   private VirtualFile searchForFQCNInModule(String fqcn) {
-    VirtualFile psiFile = ApplicationManager.getApplication().runReadAction((Computable<VirtualFile>) () -> {
+    // keeps throwing java.lang.Throwable: Slow operations are prohibited on EDT. See SlowOperations.assertSlowOperationsAreAllowed javadoc
+    /*VirtualFile psiFile = ApplicationManager.getApplication().runReadAction((Computable<VirtualFile>) () -> {
       try {
         final JavaPsiFacade facade = JavaPsiFacade.getInstance(project);
         PsiClass baseClass =
@@ -308,7 +307,7 @@ public class RenderJarClassFileFinder implements ClassFileFinder {
 
     if (psiFile != null) {
       return psiFile;
-    }
+    }*/
 
     String pkg = null;
     int pkgIdx = fqcn.lastIndexOf('.');
@@ -325,6 +324,8 @@ public class RenderJarClassFileFinder implements ClassFileFinder {
         }
       }
     }
+    List<File> moduleLibraries = new BlazeClassJarProvider(this.project).getModuleExternalLibraries(module);
+
     for (File jar : moduleLibraries) {
       VirtualFile jarVF = VirtualFileSystemProvider.getInstance().getSystem().findFileByIoFile(jar);
       if (jarVF == null) {
