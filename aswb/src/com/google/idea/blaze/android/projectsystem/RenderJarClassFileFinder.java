@@ -89,7 +89,7 @@ public class RenderJarClassFileFinder implements ClassFileFinder {
    */
   @VisibleForTesting
   static final BoolExperiment resolveResourceClasses =
-      new BoolExperiment("aswb.resolve.resources.render.jar", true);
+      new BoolExperiment("aswb.resolve.resources.render.jar", false);
 
   private static final Logger log = Logger.getInstance(RenderJarClassFileFinder.class);
 
