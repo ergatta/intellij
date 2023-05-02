@@ -64,7 +64,11 @@ class JavaOutputsProvider implements OutputsProvider {
   private static void addLibrary(
       ImmutableList.Builder<ArtifactLocation> list, @Nullable LibraryArtifact library) {
     if (library != null) {
-      addArtifact(list, library.getInterfaceJar());
+      // Interface jars have a different signature, and will break reference to source jars.
+      // Only add them if we need to.
+      if (library.getClassJar() == null) {
+        addArtifact(list, library.getInterfaceJar());
+      }
       addArtifact(list, library.getClassJar());
       library.getSourceJars().forEach(j -> addArtifact(list, j));
     }
