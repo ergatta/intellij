@@ -55,8 +55,8 @@ public class BlazeProjectSystemBuildManager implements ProjectSystemBuildManager
     //BlazeSyncManager.getInstance(project).workingSetSync("Compile files and dependencies");
     // TODO: use partialSync with targets verived from `files` (see logic in
     // BlazeSyncParams.sourceFilesToSync
-    compileProject();
-    //project.putUserData(PROJECT_LAST_BUILD_TIMESTAMP_KEY, System.currentTimeMillis());
+    //compileProject();
+    BlazeBuildService.getInstance(project).buildFiles(files);
   }
 
   @Override
