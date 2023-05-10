@@ -72,7 +72,7 @@ public class AndroidOutputsProvider implements OutputsProvider {
     if (library != null) {
       // Interface jars have a different signature, and will break reference to source jars.
       // Only add them if we need to.
-      if (library.getClassJar() == null) {
+      if (library.getClassJar() == null && library.getSourceJars().isEmpty()) {
         addArtifact(list, library.getInterfaceJar());
       }
       addArtifact(list, library.getClassJar());
