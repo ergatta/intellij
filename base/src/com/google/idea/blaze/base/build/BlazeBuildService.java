@@ -142,24 +142,21 @@ public class BlazeBuildService {
       pathsToQuery.add(path);
     }
 
-    ScopedFunction<List<TargetExpression>> targets =
-        context ->
-            BlazeQuerySourceToTargetProvider.getTargetsBuildingSourceFiles(
-                  project, pathsToQuery.build(), context, BlazeInvocationContext.ContextType.Other
-            ).stream().map(t -> t.label).collect(toImmutableList());
-
     buildTargetExpressions(
             project,
             projectView,
             projectData,
-            targets,
+            context ->
+                BlazeQuerySourceToTargetProvider.getTargetsBuildingSourceFiles(
+                        project, pathsToQuery.build(), context, BlazeInvocationContext.ContextType.Sync
+                ).stream().map(t -> t.label).collect(toImmutableList()),
             new NotificationScope(
                     project,
                     "Make",
-                    "Make project",
-                    "Make project completed successfully",
-                    "Make project failed"),
-            "Make project",
+                    "Make files",
+                    "Make files completed successfully",
+                    "Make files failed"),
+            "Make files",
             buildSystem);
 
     // In case the user touched a file, but didn't change its content. The user will get a false
