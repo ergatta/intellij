@@ -39,19 +39,14 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleManager;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.JarFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.psi.JavaPsiFacade;
-import com.intellij.psi.PsiClass;
-import com.intellij.psi.search.ProjectScope;
-import org.jetbrains.android.util.AndroidUtils;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -88,8 +83,8 @@ public class RenderJarClassFileFinder implements ClassFileFinder {
    * screen require that all classes resolve in order to display the content, so we allow it.
    */
   @VisibleForTesting
-  static final BoolExperiment resolveResourceClasses =
-      new BoolExperiment("aswb.resolve.resources.render.jar", false);
+  static final BoolExperiment resolveResourceClasses = // TODO: figure out if this is actually needed......
+      new BoolExperiment("aswb.resolve.resources.render.jar", true);
 
   private static final Logger log = Logger.getInstance(RenderJarClassFileFinder.class);
 
@@ -114,7 +109,7 @@ public class RenderJarClassFileFinder implements ClassFileFinder {
   // true if the current module is the .workspace Module
   private final boolean isWorkspaceModule;
 
-  private Map<String, File> packageJarHint = new HashMap();
+  private Map<String, HashSet<File>> packageJarHint = new HashMap();
 
   public RenderJarClassFileFinder(Module module) {
     this.module = module;
@@ -210,8 +205,8 @@ public class RenderJarClassFileFinder implements ClassFileFinder {
   }
 
   public synchronized void clearCache() {
-    log.warn("clearing cache");
-    packageJarHint = new HashMap();
+    //log.warn("clearing cache");
+    //packageJarHint = new HashMap();
   }
 
   @VisibleForTesting
@@ -314,13 +309,15 @@ public class RenderJarClassFileFinder implements ClassFileFinder {
     if (pkgIdx != -1) {
       pkg = fqcn.substring(0, pkgIdx);
     }
-    File hintJar = pkg == null ? null : packageJarHint.get(pkg);
-    if (hintJar != null) {
-      VirtualFile jarVF = VirtualFileSystemProvider.getInstance().getSystem().findFileByIoFile(hintJar);
-      if (jarVF != null) {
-        VirtualFile foundClass = findClassInJar(jarVF, fqcn);
-        if (foundClass != null) {
-          return foundClass;
+    HashSet<File> hintJars = pkg == null ? null : packageJarHint.get(pkg);
+    if (hintJars != null) {
+      for (File hintJar : hintJars) {
+        VirtualFile jarVF = VirtualFileSystemProvider.getInstance().getSystem().findFileByIoFile(hintJar);
+        if (jarVF != null) {
+          VirtualFile foundClass = findClassInJar(jarVF, fqcn);
+          if (foundClass != null) {
+            return foundClass;
+          }
         }
       }
     }
@@ -334,7 +331,10 @@ public class RenderJarClassFileFinder implements ClassFileFinder {
       VirtualFile foundClass = findClassInJar(jarVF, fqcn);
       if (foundClass != null) {
         if (pkg != null) {
-          packageJarHint.put(pkg, jar);
+          if (hintJars == null) hintJars = new HashSet<>();
+          hintJars.add(jar);
+          // TODO: better caching
+          packageJarHint.put(pkg, hintJars);
         }
         return foundClass;
       }
