@@ -244,6 +244,9 @@ public final class BlazeJavaWorkspaceImporter {
     for (ArtifactLocation sourceJar : libraryArtifact.getSourceJars()) {
       jdepsPathToLibrary.put(sourceJar.getRelativePath(), library);
     }
+    for (ArtifactLocation sourceJar : libraryArtifact.getSourceJars()) {
+      jdepsPathToLibrary.put(sourceJar.getRelativePath(), library);
+    }
   }
 
   private void addTargetAsSource(
