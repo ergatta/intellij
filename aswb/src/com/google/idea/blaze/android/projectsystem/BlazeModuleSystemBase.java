@@ -291,7 +291,7 @@ abstract class BlazeModuleSystemBase implements AndroidModuleSystem {
   private Label getResolvedLabel(GradleCoordinate coordinate) {
     return MavenArtifactLocator.forBuildSystem(Blaze.getBuildSystemName(module.getProject()))
         .stream()
-        .map(locator -> locator.labelFor(coordinate))
+        .map(locator -> locator.labelFor(module.getProject(), coordinate))
         .map(l -> new Label(l.toString()))
         .findFirst()
         .orElse(null);
