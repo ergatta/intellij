@@ -15,8 +15,6 @@
  */
 package com.google.idea.blaze.android.sync.importer;
 
-import static java.util.stream.Collectors.toCollection;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ComparisonChain;
@@ -46,6 +44,9 @@ import com.google.idea.blaze.base.scope.output.PerformanceWarning;
 import com.google.idea.blaze.common.Output;
 import com.google.idea.common.experiments.BoolExperiment;
 import com.intellij.openapi.project.Project;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -58,8 +59,8 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+
+import static java.util.stream.Collectors.toCollection;
 
 /** Builds a BlazeWorkspace. */
 public class BlazeAndroidWorkspaceImporter {
@@ -280,7 +281,8 @@ public class BlazeAndroidWorkspaceImporter {
 
   public static boolean isSourceOrAllowedGenPath(
       ArtifactLocation artifactLocation, Predicate<ArtifactLocation> allowlistTest) {
-    return artifactLocation.isSource() || allowlistTest.test(artifactLocation);
+    return true; // TODO: TEST: remove later
+    //return artifactLocation.isSource() || allowlistTest.test(artifactLocation);
   }
 
   private ImmutableList<AndroidResourceModule> buildAndroidResourceModules(

@@ -49,6 +49,7 @@ public class LibraryModifier {
   /** Writes the library content to its {@link Library.ModifiableModel}. */
   public void updateModifiableModel(BlazeProjectData blazeProjectData) {
     removeAllContents();
+
     for (File classFile : libraryFilesProvider.getClassFiles(blazeProjectData)) {
       addRoot(classFile, OrderRootType.CLASSES);
     }

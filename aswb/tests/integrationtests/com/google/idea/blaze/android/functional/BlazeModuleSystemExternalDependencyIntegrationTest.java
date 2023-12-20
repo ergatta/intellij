@@ -15,10 +15,6 @@
  */
 package com.google.idea.blaze.android.functional;
 
-import static com.google.common.truth.Truth.assertThat;
-import static com.google.idea.blaze.android.targetmapbuilder.NbAarTarget.aar_import;
-import static com.google.idea.blaze.android.targetmapbuilder.NbAndroidTarget.android_library;
-
 import com.android.SdkConstants;
 import com.android.ide.common.repository.GradleCoordinate;
 import com.android.tools.idea.projectsystem.GoogleMavenArtifactId;
@@ -36,14 +32,20 @@ import com.google.idea.blaze.base.model.primitives.WorkspacePath;
 import com.google.idea.blaze.base.settings.BuildSystemName;
 import com.google.idea.blaze.base.sync.projectstructure.ModuleFinder;
 import com.intellij.openapi.module.Module;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.util.PathUtil;
-import java.io.File;
-import java.nio.file.Path;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+
+import java.io.File;
+import java.nio.file.Path;
+
+import static com.google.common.truth.Truth.assertThat;
+import static com.google.idea.blaze.android.targetmapbuilder.NbAarTarget.aar_import;
+import static com.google.idea.blaze.android.targetmapbuilder.NbAndroidTarget.android_library;
 
 /**
  * Integration test for external dependency management methods in {@link
@@ -68,7 +70,7 @@ public class BlazeModuleSystemExternalDependencyIntegrationTest
                   .build();
 
           @Override
-          public Label labelFor(GradleCoordinate coordinate) {
+          public Label labelFor(Project project, GradleCoordinate coordinate) {
             return knownArtifacts.get(
                 new GradleCoordinate(coordinate.getGroupId(), coordinate.getArtifactId(), "+"));
           }

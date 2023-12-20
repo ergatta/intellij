@@ -15,8 +15,6 @@
  */
 package com.google.idea.blaze.android.sync.model.idea;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
-
 import com.android.tools.idea.model.ClassJarProvider;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -33,6 +31,7 @@ import com.google.idea.blaze.base.ideinfo.TargetKey;
 import com.google.idea.blaze.base.ideinfo.TargetMap;
 import com.google.idea.blaze.base.model.BlazeProjectData;
 import com.google.idea.blaze.base.qsync.QuerySync;
+import com.google.idea.blaze.base.sync.data.BlazeDataStorage;
 import com.google.idea.blaze.base.sync.data.BlazeProjectDataManager;
 import com.google.idea.blaze.base.sync.workspace.ArtifactLocationDecoder;
 import com.google.idea.blaze.base.targetmaps.TransitiveDependencyMap;
@@ -50,9 +49,13 @@ import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.search.GlobalSearchScope;
+
 import java.io.File;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
+
+import static com.google.common.collect.ImmutableList.toImmutableList;
 
 /** Collects class jars from the user's build. */
 public class BlazeClassJarProvider implements ClassJarProvider {
@@ -81,9 +84,14 @@ public class BlazeClassJarProvider implements ClassJarProvider {
 
     TargetMap targetMap = blazeProjectData.getTargetMap();
     ArtifactLocationDecoder decoder = blazeProjectData.getArtifactLocationDecoder();
+    boolean isWorkspaceModule = BlazeDataStorage.WORKSPACE_MODULE_NAME.equals(module.getName());
+
+    if (isWorkspaceModule) {
+      return getAllExternalLibraries(targetMap, decoder);
+    }
 
     if (useRenderJarForExternalLibraries.getValue()) {
-      return TargetToBinaryMap.getInstance(project).getSourceBinaryTargets().stream()
+      List<File> renderJarLibraries = TargetToBinaryMap.getInstance(project).getSourceBinaryTargets().stream()
           .filter(targetMap::contains)
           .map(
               (binaryTarget) ->
@@ -91,6 +99,9 @@ public class BlazeClassJarProvider implements ClassJarProvider {
                       .getCachedJarForBinaryTarget(decoder, targetMap.get(binaryTarget)))
           .filter(Objects::nonNull)
           .collect(toImmutableList());
+      if (!renderJarLibraries.isEmpty()) {
+        return renderJarLibraries;
+      }
     }
 
     AndroidResourceModuleRegistry registry = AndroidResourceModuleRegistry.getInstance(project);
@@ -112,7 +123,7 @@ public class BlazeClassJarProvider implements ClassJarProvider {
       if (javaIdeInfo != null) {
         for (LibraryArtifact jar : javaIdeInfo.getJars()) {
           ArtifactLocation classJar = jar.getClassJar();
-          if (classJar != null && classJar.isSource()) {
+          if (classJar != null) {
             results.add(
                 Preconditions.checkNotNull(
                     OutputArtifactResolver.resolve(project, decoder, classJar),
@@ -185,5 +196,15 @@ public class BlazeClassJarProvider implements ClassJarProvider {
     }
 
     return false;
+  }
+
+  List<File> getAllExternalLibraries(TargetMap targetMap, ArtifactLocationDecoder decoder) {
+    return targetMap.targets().stream()
+        .map(x -> x.getJavaIdeInfo())
+        .filter(Objects::nonNull)
+        .flatMap(x -> x.getJars().stream())
+        .map(LibraryArtifact::getClassJar).filter(Objects::nonNull)
+        .map(x -> OutputArtifactResolver.resolve(project, decoder, x))
+        .collect(Collectors.toList());
   }
 }

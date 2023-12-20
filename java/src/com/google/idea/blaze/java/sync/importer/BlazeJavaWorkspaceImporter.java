@@ -15,9 +15,6 @@
  */
 package com.google.idea.blaze.java.sync.importer;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
-import static java.util.stream.Collectors.toList;
-
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -57,6 +54,8 @@ import com.google.idea.blaze.java.sync.source.SourceArtifact;
 import com.google.idea.blaze.java.sync.source.SourceDirectoryCalculator;
 import com.google.idea.blaze.java.sync.workingset.JavaWorkingSet;
 import com.intellij.openapi.project.Project;
+
+import javax.annotation.Nullable;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
@@ -64,7 +63,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
+
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.stream.Collectors.toList;
 
 /** Builds a BlazeWorkspace. */
 public final class BlazeJavaWorkspaceImporter {
@@ -234,12 +235,17 @@ public final class BlazeJavaWorkspaceImporter {
       Map<String, BlazeJarLibrary> jdepsPathToLibrary, BlazeJarLibrary library) {
     LibraryArtifact libraryArtifact = library.libraryArtifact;
     ArtifactLocation interfaceJar = libraryArtifact.getInterfaceJar();
-    if (interfaceJar != null) {
-      jdepsPathToLibrary.put(interfaceJar.getRelativePath(), library);
-    }
     ArtifactLocation classJar = libraryArtifact.getClassJar();
     if (classJar != null) {
       jdepsPathToLibrary.put(classJar.getRelativePath(), library);
+    } else if (interfaceJar != null) {
+      jdepsPathToLibrary.put(interfaceJar.getRelativePath(), library);
+    }
+    for (ArtifactLocation sourceJar : libraryArtifact.getSourceJars()) {
+      jdepsPathToLibrary.put(sourceJar.getRelativePath(), library);
+    }
+    for (ArtifactLocation sourceJar : libraryArtifact.getSourceJars()) {
+      jdepsPathToLibrary.put(sourceJar.getRelativePath(), library);
     }
   }
 

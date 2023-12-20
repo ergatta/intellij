@@ -16,6 +16,7 @@
 package com.google.idea.blaze.base.build;
 
 import com.google.common.collect.ImmutableCollection;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.FutureCallback;
@@ -27,12 +28,14 @@ import com.google.idea.blaze.base.bazel.BuildSystem;
 import com.google.idea.blaze.base.bazel.BuildSystem.BuildInvoker;
 import com.google.idea.blaze.base.bazel.BuildSystem.SyncStrategy;
 import com.google.idea.blaze.base.command.BlazeInvocationContext;
+import com.google.idea.blaze.base.dependencies.BlazeQuerySourceToTargetProvider;
 import com.google.idea.blaze.base.experiments.ExperimentScope;
 import com.google.idea.blaze.base.filecache.FileCaches;
 import com.google.idea.blaze.base.issueparser.BlazeIssueParser;
 import com.google.idea.blaze.base.model.BlazeProjectData;
 import com.google.idea.blaze.base.model.primitives.Label;
 import com.google.idea.blaze.base.model.primitives.TargetExpression;
+import com.google.idea.blaze.base.model.primitives.WorkspacePath;
 import com.google.idea.blaze.base.model.primitives.WorkspaceRoot;
 import com.google.idea.blaze.base.projectview.ProjectViewManager;
 import com.google.idea.blaze.base.projectview.ProjectViewSet;
@@ -58,15 +61,22 @@ import com.google.idea.blaze.base.sync.aspects.strategy.AspectStrategy.OutputGro
 import com.google.idea.blaze.base.sync.data.BlazeProjectDataManager;
 import com.google.idea.blaze.base.sync.sharding.BlazeBuildTargetSharder;
 import com.google.idea.blaze.base.sync.sharding.BlazeBuildTargetSharder.ShardedTargetsResult;
+import com.google.idea.blaze.base.sync.workspace.WorkspacePathResolver;
 import com.google.idea.blaze.base.toolwindow.Task;
 import com.google.idea.blaze.base.util.SaveUtil;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
+import com.intellij.openapi.vfs.VirtualFile;
+
+import java.io.File;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Future;
 import javax.annotation.Nullable;
+
+import static com.google.common.collect.ImmutableList.toImmutableList;
 
 /** Utility to build various collections of targets. */
 public class BlazeBuildService {
@@ -110,6 +120,50 @@ public class BlazeBuildService {
             project, "Make", title, title + " completed successfully", title + " failed"),
         title,
         buildSystem);
+  }
+
+  public void buildFiles(Collection<? extends VirtualFile> files) {
+    if (!Blaze.isBlazeProject(project)) {
+      return;
+    }
+    ProjectViewSet projectView = ProjectViewManager.getInstance(project).getProjectViewSet();
+    BlazeProjectData projectData =
+            BlazeProjectDataManager.getInstance(project).getBlazeProjectData();
+    if (projectView == null || projectData == null) {
+      return;
+    }
+    WorkspacePathResolver resolver = projectData.getWorkspacePathResolver();
+
+    ImmutableList.Builder<WorkspacePath> pathsToQuery = ImmutableList.builder();
+    for (VirtualFile file : files) {
+      WorkspacePath path = resolver.getWorkspacePath(new File(file.getPath()));
+      if (path == null) {
+        continue;
+      }
+      pathsToQuery.add(path);
+    }
+
+    buildTargetExpressions(
+            project,
+            projectView,
+            projectData,
+            context ->
+                BlazeQuerySourceToTargetProvider.getTargetsBuildingSourceFiles(
+                        project, pathsToQuery.build(), context, BlazeInvocationContext.ContextType.Sync
+                ).stream().map(t -> t.label).collect(toImmutableList()),
+            new NotificationScope(
+                    project,
+                    "Make",
+                    "Make files",
+                    "Make files completed successfully",
+                    "Make files failed"),
+            "Make files",
+            buildSystem);
+
+    // In case the user touched a file, but didn't change its content. The user will get a false
+    // positive for class file out of date. We need a way for the user to suppress the false
+    // message. Clicking the "build project" link should at least make the message go away.
+    project.putUserData(PROJECT_LAST_BUILD_TIMESTAMP_KEY, System.currentTimeMillis());
   }
 
   public void buildProject() {

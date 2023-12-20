@@ -15,8 +15,6 @@
  */
 package com.google.idea.blaze.android.projectsystem;
 
-import static java.lang.Math.max;
-
 import com.android.annotations.concurrency.UiThread;
 import com.android.tools.idea.projectsystem.ProjectSystemBuildManager;
 import com.google.idea.blaze.base.build.BlazeBuildListener;
@@ -28,9 +26,12 @@ import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.messages.Topic;
+import org.jetbrains.annotations.NotNull;
+
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.jetbrains.annotations.NotNull;
+
+import static java.lang.Math.max;
 
 /** Blaze implementation of {@link ProjectSystemBuildManager} */
 public class BlazeProjectSystemBuildManager implements ProjectSystemBuildManager {
@@ -51,8 +52,12 @@ public class BlazeProjectSystemBuildManager implements ProjectSystemBuildManager
   @Override
   public void compileFilesAndDependencies(Collection<? extends VirtualFile> files) {
     // TODO(b/191937319): Implement incremental builds for individual files
-    // Just compile the entire project for now.
-    compileProject();
+    // Do an incremental sync for now so that previews update appropriately
+    //BlazeSyncManager.getInstance(project).workingSetSync("Compile files and dependencies");
+    // TODO: use partialSync with targets verived from `files` (see logic in
+    // BlazeSyncParams.sourceFilesToSync
+    //compileProject();
+    BlazeBuildService.getInstance(project).buildFiles(files);
   }
 
   @Override

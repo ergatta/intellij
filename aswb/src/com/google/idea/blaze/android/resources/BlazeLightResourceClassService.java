@@ -15,8 +15,6 @@
  */
 package com.google.idea.blaze.android.resources;
 
-import static com.google.common.collect.ImmutableSet.toImmutableSet;
-
 import com.android.tools.idea.projectsystem.LightResourceClassService;
 import com.android.tools.idea.res.AndroidLightPackage;
 import com.google.common.annotations.VisibleForTesting;
@@ -35,12 +33,15 @@ import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.PsiPackage;
 import com.intellij.psi.search.GlobalSearchScope;
+import org.jetbrains.android.facet.AndroidFacet;
+import org.jetbrains.annotations.Nullable;
+
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import org.jetbrains.android.facet.AndroidFacet;
-import org.jetbrains.annotations.Nullable;
+
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 /** Implementation of {@link LightResourceClassService} set up at Blaze sync time. */
 public class BlazeLightResourceClassService implements LightResourceClassService {
